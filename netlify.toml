@@ -1,0 +1,4 @@
+# File ini memberitahu Netlify di mana menemukan fungsi backend Anda.
+
+[functions]
+  directory = "netlify/functions/"

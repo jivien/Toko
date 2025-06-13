@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monggo - E-commerce</title>
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.5s ease-in-out; }
+        .orbitron { font-family: 'Orbitron', sans-serif; }
+        .hidden-view { display: none !important; }
+        #landing-page { background-image: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=2070&auto=format&fit=crop'); background-size: cover; background-position: center; transition: background-image 0.5s ease-in-out; }
+        .landing-overlay { background-color: rgba(10, 10, 10, 0.7); backdrop-filter: blur(4px); }
+        .fade-in-up { animation: fadeInUp 1s ease-out forwards; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .input-tech { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); transition: border-color 0.3s, box-shadow 0.3s; }
+        .input-tech:focus { border-color: #4f46e5; box-shadow: 0 0 15px rgba(79, 70, 229, 0.5); }
+        .product-card { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+        .product-card.is-visible { opacity: 1; transform: translateY(0); }
+        .card-carousel-container { position: relative; }
+        .card-carousel-track { display: flex; transition: transform 0.3s ease-in-out; }
+        .card-carousel-slide { flex: 0 0 100%; width: 100%; position: relative; }
+        .carousel-btn { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0, 0, 0, 0.4); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.2s ease; z-index: 10; }
+        .card-carousel-container:hover .carousel-btn { opacity: 1; }
+        .carousel-btn.left { left: 8px; }
+        .carousel-btn.right { right: 8px; }
+        .modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
+        .modal.hidden { visibility: hidden; opacity: 0; }
+        .video-responsive { overflow: hidden; padding-bottom: 56.25%; position: relative; height: 0; }
+        .video-responsive iframe { left: 0; top: 0; height: 100%; width: 100%; position: absolute; }
+        .chat-bubble-user { background-color: #4f46e5; color: white; }
+        .chat-bubble-admin { background-color: #e5e7eb; color: #1f2937; }
+    </style>
+</head>
+<body>
+
+    <!-- Seluruh Konten HTML (User App & Admin App) -->
+    <div id="user-app" class="hidden">...</div>
+    <div id="admin-app" class="hidden">...</div>
+    
+    <script>
+        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js'); }); }
+    </script>
+    <script type="module">
+        // (DIUBAH) Kita hanya butuh Auth & Firestore Client SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, doc, setDoc, getDoc, onSnapshot, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA3GPX4JG7COQIMjIGVIgtOu_aW90pYZzY",
+            authDomain: "monggo-monggo.firebaseapp.com",
+            projectId: "monggo-monggo",
+            storageBucket: "monggo-monggo.appspot.com",
+            messagingSenderId: "179927305825",
+            appId: "1:179927305825:web:a8fc528a86e49b80366420",
+            measurementId: "G-NXJ8B7F8M8"
+        };
+        const WHATSAPP_NUMBER = '6281211862924';
+
+        let app, db, auth;
+        try {
+             app = initializeApp(firebaseConfig);
+             db = getFirestore(app);
+             auth = getAuth(app);
+        } catch(e) { /* Error handling */ }
+
+        // ... (Logika Routing & Admin App tetap sama persis) ...
+        
+        async function initUserApp() {
+            const productListContainer = document.getElementById('product-list');
+            if (!db) { /* ... */ return; }
+
+            let products = [];
+            
+            // (DIUBAH) Fungsi ini sekarang memanggil backend Netlify kita
+            const loadInitialData = async () => {
+                try {
+                    // Alamat ini adalah endpoint otomatis dari Netlify Functions
+                    const response = await fetch('/api/getFirebaseData');
+                    if (!response.ok) throw new Error(`Server Error: ${response.status}`);
+                    const data = await response.json();
+
+                    // Terapkan tema dari data yang diterima
+                    if (data.theme) {
+                        if (data.theme.landingBgUrl) document.getElementById('landing-page').style.backgroundImage = `url('${data.theme.landingBgUrl}')`;
+                        if (data.theme.catalogBgColor) document.getElementById('catalog-page').style.backgroundColor = data.theme.catalogBgColor;
+                    }
+                    
+                    // Simpan produk ke variabel global dan render
+                    products = data.products || [];
+                    renderProducts(products);
+
+                } catch (error) {
+                    console.error("Gagal memuat data dari server:", error);
+                    productListContainer.innerHTML = "<p class='text-center text-red-500'>Gagal memuat data. Coba refresh halaman.</p>";
+                }
+            };
+
+            const showCatalog = async (userName) => {
+                document.getElementById('welcome-message').textContent = `Halo, ${userName}!`;
+                document.getElementById('landing-page').classList.add('hidden');
+                document.getElementById('catalog-page').classList.remove('hidden');
+                
+                let userId = localStorage.getItem('monggoUserId');
+                if (!userId) { userId = crypto.randomUUID(); localStorage.setItem('monggoUserId', userId); }
+                initChatForUser(userId, userName);
+                
+                if (products.length === 0) {
+                    productListContainer.innerHTML = "<p class='text-center text-slate-500'>Memuat produk...</p>";
+                    await loadInitialData();
+                } else {
+                    renderProducts(products);
+                }
+            };
+            
+            // ... (Sisa dari seluruh kode JavaScript Anda tetap sama)
+        }
+
+        // ... (Fungsi lainnya seperti initAdminApp, initChatForUser, renderProducts, dll)
+
+        window.addEventListener('hashchange', handleRouting);
+        handleRouting();
+    </script>
+</body>
+</html>
+
